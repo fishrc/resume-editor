@@ -9,6 +9,7 @@
    PGUSER=liveresume_user
    PGPASSWORD=your-password
    PGSSLMODE=verify-full
+   RESUME_SCHEMA=liveresume
    ```
 
 2. 运行 `npm run db:migrate` 创建 `liveresume_drafts` 和 `liveresume_snapshots` 表。

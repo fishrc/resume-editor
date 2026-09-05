@@ -1,15 +1,19 @@
 import pg from 'pg';
 import {readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
+import {parseEnv} from 'node:util';
+if(existsSync('.env.local')){try{Object.assign(process.env,parseEnv(readFileSync('.env.local','utf8')));}catch{}}
 export function connectionConfig(env=process.env){
  let url;try{url=env.DATABASE_URL?new URL(env.DATABASE_URL):null;}catch{throw new Error('DATABASE_CONFIG');}
  if(url&&!['postgres:','postgresql:'].includes(url.protocol))throw new Error('DATABASE_CONFIG');
  const host=url?.hostname||env.PGHOST,database=decodeURIComponent(url?.pathname.slice(1)||env.PGDATABASE||'');
  const user=env.PGUSER||decodeURIComponent(url?.username||''),password=env.PGPASSWORD||decodeURIComponent(url?.password||'');
  if(!host||!database||!user||!password)throw new Error('DATABASE_CONFIG');
+ const schema=env.RESUME_SCHEMA||'public';if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema))throw new Error('DATABASE_CONFIG');
  const mode=env.PGSSLMODE||url?.searchParams.get('sslmode')||'verify-full';
  if(!['disable','require','verify-full','verify-ca'].includes(mode))throw new Error('DATABASE_CONFIG');
  const port=Number(url?.port||env.PGPORT||5432);if(!Number.isInteger(port)||port<1||port>65535)throw new Error('DATABASE_CONFIG');
- return {host:host.replace(/^\[|\]$/g,''),port,database,user,password,ssl:mode==='disable'?false:{rejectUnauthorized:true,...(env.PGSSLROOTCERT?{ca:readFileSync(env.PGSSLROOTCERT,'utf8')}:{})},max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:10000,application_name:'liveresume-local'};
+ return {host:host.replace(/^\[|\]$/g,''),port,database,user,password,options:`-c search_path=${schema},public`,ssl:mode==='disable'?false:{rejectUnauthorized:mode==='verify-full'||mode==='verify-ca',...(env.PGSSLROOTCERT?{ca:readFileSync(env.PGSSLROOTCERT,'utf8')}:{})},max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:10000,application_name:'liveresume-local'};
 }
 let pool;
 export function getPool(){if(!pool){pool=new pg.Pool(connectionConfig());pool.on('error',()=>console.error('PostgreSQL idle connection failed'));}return pool;}
